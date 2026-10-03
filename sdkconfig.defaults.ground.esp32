@@ -1,0 +1,4 @@
+# Classic ESP32 ground unit: MAVLink uses UART0 (the board's USB-UART chip),
+# so the console and bootloader output must be silenced.
+CONFIG_ESP_CONSOLE_NONE=y
+CONFIG_BOOTLOADER_LOG_LEVEL_NONE=y

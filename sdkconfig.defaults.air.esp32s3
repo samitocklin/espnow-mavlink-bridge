@@ -1,0 +1,4 @@
+# ESP32-S3 air unit: the flight controller is on UART0 (TX GPIO43 / RX GPIO44),
+# so the console and bootloader log move to the built-in USB port only.
+CONFIG_ESP_CONSOLE_USB_SERIAL_JTAG=y
+CONFIG_ESP_CONSOLE_SECONDARY_NONE=y

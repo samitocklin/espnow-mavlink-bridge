@@ -1,0 +1,4 @@
+# Ground unit: MAVLink uses the built-in USB port, so the console must stay
+# off USB-Serial-JTAG (logs remain on the UART0 pins).
+CONFIG_ESP_CONSOLE_UART_DEFAULT=y
+CONFIG_ESP_CONSOLE_SECONDARY_NONE=y

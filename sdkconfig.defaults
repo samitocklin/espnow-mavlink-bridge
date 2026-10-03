@@ -1,0 +1,29 @@
+# ---- Common defaults for both roles and all targets ----
+# 1 ms scheduler tick for tight serial idle / batching timing
+CONFIG_FREERTOS_HZ=1000
+
+# Watchdogs: every bridge task is subscribed; a hang reboots within 2 s
+CONFIG_ESP_TASK_WDT_EN=y
+CONFIG_ESP_TASK_WDT_INIT=y
+CONFIG_ESP_TASK_WDT_TIMEOUT_S=2
+CONFIG_ESP_TASK_WDT_PANIC=y
+CONFIG_ESP_TASK_WDT_CHECK_IDLE_TASK_CPU0=y
+CONFIG_ESP_INT_WDT=y
+CONFIG_ESP_SYSTEM_PANIC_PRINT_REBOOT=y
+
+# Brown-out detection (a sagging BEC must reset cleanly, not corrupt state)
+CONFIG_ESP_BROWNOUT_DET=y
+
+# Memory-safety nets
+CONFIG_COMPILER_STACK_CHECK_MODE_STRONG=y
+CONFIG_FREERTOS_CHECK_STACKOVERFLOW_CANARY=y
+CONFIG_COMPILER_OPTIMIZATION_ASSERTIONS_ENABLE=y
+CONFIG_COMPILER_OPTIMIZATION_PERF=y
+
+# Radio: allow the full hardware TX power (the driver still applies country limits)
+CONFIG_ESP_PHY_MAX_WIFI_TX_POWER=20
+
+# Wi-Fi: no station connection is ever made; keep RAM-only config
+CONFIG_ESP_WIFI_NVS_ENABLED=n
+
+CONFIG_LOG_DEFAULT_LEVEL_INFO=y

@@ -1,0 +1,195 @@
+menu "ESP-NOW MAVLink bridge"
+
+    choice BRIDGE_ROLE
+        prompt "Unit role"
+        default BRIDGE_ROLE_GROUND
+        help
+            GROUND plugs into the computer running the GCS. AIR connects to the
+            flight controller's telemetry UART. A link only forms between one
+            GROUND and one AIR unit that share the same network id and key.
+
+        config BRIDGE_ROLE_GROUND
+            bool "Ground (GCS / computer side)"
+        config BRIDGE_ROLE_AIR
+            bool "Air (flight controller side)"
+    endchoice
+
+    menu "Radio link"
+
+        config BRIDGE_NET_ID
+            hex "Network id"
+            range 0x0001 0xFFFF
+            default 0x4D42
+            help
+                Separates bridge pairs that share a channel. Must match on both units.
+
+        config BRIDGE_KEY
+            string "Shared key (32 hex characters)"
+            default "CHANGE_ME"
+            help
+                128-bit key, identical on both units. Used to authenticate pairing
+                and to derive the ESP-NOW encryption keys. The firmware refuses to
+                transmit with the placeholder value. Generate one with
+                scripts/gen_key.sh.
+
+        config BRIDGE_WIFI_CHANNEL
+            int "Wi-Fi channel"
+            range 1 13
+            default 13
+            help
+                Both units must use the same channel (scripts/set_channel.sh keeps
+                them in sync). Most Wi-Fi networks use 1, 6 or 11; channel 13
+                (2472 MHz) is the furthest from all three and overlaps only the top
+                edge of 11. It is legal in the EU and most of the world, but NOT in
+                the US/Canada (use 1-11 there, e.g. 3 or 9 between the busy ones).
+                The channel must be allowed by BRIDGE_COUNTRY or the unit refuses
+                to start the radio.
+
+        config BRIDGE_COUNTRY
+            string "Regulatory country code"
+            default "FI"
+            help
+                ISO country code for the Wi-Fi regulatory domain (channels and TX
+                power limits), e.g. FI, SE, DE, GB, US, JP. "01" is the ESP32's
+                world-safe mode, which does not allow transmitting on 12-13.
+
+        config BRIDGE_TX_POWER_DBM
+            int "Maximum TX power (dBm)"
+            range 2 20
+            default 20
+            help
+                20 dBm is the ESP32 hardware maximum and also the EU legal limit
+                (EIRP). The driver additionally clamps to BRIDGE_COUNTRY's limit;
+                the applied value is logged at boot. Range beyond this comes from
+                antennas (and must stay within EIRP limits), not from software.
+
+        choice BRIDGE_PHY_RATE
+            prompt "Air data rate"
+            default BRIDGE_RATE_LR_250K
+            help
+                Espressif Long Range (LR) modes trade throughput for sensitivity
+                and range. LR 250 kbps (default) gives the most range, roughly
+                8-10 dB more link budget than 1 Mbps, and still carries a 57600-
+                baud telemetry stream with headroom. Pick 1 Mbps for high serial
+                baud rates (>= 230400) at short range. Both units must match.
+
+            config BRIDGE_RATE_1M
+                bool "1 Mbps (802.11b)"
+            config BRIDGE_RATE_LR_500K
+                bool "Long Range 500 kbps"
+            config BRIDGE_RATE_LR_250K
+                bool "Long Range 250 kbps"
+        endchoice
+
+        config BRIDGE_HEARTBEAT_MS
+            int "Link heartbeat period (ms)"
+            range 50 500
+            default 100
+
+        config BRIDGE_DEGRADED_MS
+            int "Peer silence before DEGRADED (ms)"
+            range 100 5000
+            default 300
+
+        config BRIDGE_LOST_MS
+            int "Peer silence before LOST (ms)"
+            range 200 10000
+            default 1500
+            help
+                On LOST all queued data is discarded (never delivered late) and
+                the unit returns to searching for its peer.
+
+        config BRIDGE_MAX_HOLD_MS
+            int "Max time a complete packet waits for batching (ms)"
+            range 1 50
+            default 5
+
+        config BRIDGE_RADIO_STATUS
+            bool "Inject MAVLink RADIO_STATUS (1 Hz) like a SiK radio"
+            default y
+
+    endmenu
+
+    menu "Serial port"
+
+        choice BRIDGE_PORT
+            prompt "MAVLink serial port"
+            default BRIDGE_PORT_USB_SERIAL_JTAG if BRIDGE_ROLE_GROUND && SOC_USB_SERIAL_JTAG_SUPPORTED
+            default BRIDGE_PORT_UART
+
+            config BRIDGE_PORT_UART
+                bool "UART"
+            config BRIDGE_PORT_USB_SERIAL_JTAG
+                bool "Built-in USB (USB-Serial-JTAG, ESP32-C3/S3)"
+                depends on SOC_USB_SERIAL_JTAG_SUPPORTED
+        endchoice
+
+        config BRIDGE_UART_NUM
+            int "UART number"
+            depends on BRIDGE_PORT_UART
+            range 0 2
+            default 0 if BRIDGE_ROLE_GROUND
+            default 0 if IDF_TARGET_ESP32S3
+            default 1
+
+        config BRIDGE_UART_BAUD
+            int "Baud rate"
+            depends on BRIDGE_PORT_UART
+            default 57600
+
+        config BRIDGE_UART_TX_GPIO
+            int "TX GPIO (-1 = UART default)"
+            depends on BRIDGE_PORT_UART
+            range -1 48
+            default -1 if BRIDGE_ROLE_GROUND
+            default 17 if IDF_TARGET_ESP32
+            default 5 if IDF_TARGET_ESP32C3
+            default 43 if IDF_TARGET_ESP32S3
+            default -1
+
+        config BRIDGE_UART_RX_GPIO
+            int "RX GPIO (-1 = UART default)"
+            depends on BRIDGE_PORT_UART
+            range -1 48
+            default -1 if BRIDGE_ROLE_GROUND
+            default 16 if IDF_TARGET_ESP32
+            default 4 if IDF_TARGET_ESP32C3
+            default 44 if IDF_TARGET_ESP32S3
+            default -1
+
+        config BRIDGE_UART_FLOWCTRL
+            bool "RTS/CTS hardware flow control"
+            depends on BRIDGE_PORT_UART
+            default n
+
+        config BRIDGE_UART_RTS_GPIO
+            int "RTS GPIO"
+            depends on BRIDGE_UART_FLOWCTRL
+            range 0 48
+            default 7
+
+        config BRIDGE_UART_CTS_GPIO
+            int "CTS GPIO"
+            depends on BRIDGE_UART_FLOWCTRL
+            range 0 48
+            default 6
+
+    endmenu
+
+    menu "Status LED"
+
+        config BRIDGE_LED_GPIO
+            int "LED GPIO (-1 = none)"
+            range -1 48
+            default 2 if IDF_TARGET_ESP32
+            default 8 if IDF_TARGET_ESP32C3
+            default -1
+
+        config BRIDGE_LED_ACTIVE_LOW
+            bool "LED is active low"
+            default y if IDF_TARGET_ESP32C3
+            default n
+
+    endmenu
+
+endmenu
